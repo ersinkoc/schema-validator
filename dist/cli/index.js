@@ -1,0 +1,349 @@
+#!/usr/bin/env node
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const commander_1 = require("commander");
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const ts = __importStar(require("typescript"));
+const package_json_1 = require("../../package.json");
+const program = new commander_1.Command();
+program
+    .name('oxog-validator')
+    .description('CLI tool for @oxog/schema-validator')
+    .version(package_json_1.version);
+program
+    .command('generate')
+    .description('Generate validation schemas from TypeScript types')
+    .option('-i, --input <file>', 'Input TypeScript file')
+    .option('-o, --output <file>', 'Output schema file')
+    .option('-t, --type <name>', 'Specific type to generate (optional)')
+    .action(async (options) => {
+    try {
+        await generateSchemas(options);
+    }
+    catch (error) {
+        console.error('Error generating schemas:', error);
+        process.exit(1);
+    }
+});
+program
+    .command('validate')
+    .description('Validate data against a schema')
+    .option('-s, --schema <file>', 'Schema file path')
+    .option('-d, --data <file>', 'Data file path (JSON)')
+    .option('-v, --verbose', 'Verbose output')
+    .action(async (options) => {
+    try {
+        await validateData(options);
+    }
+    catch (error) {
+        console.error('Error validating data:', error);
+        process.exit(1);
+    }
+});
+program
+    .command('watch')
+    .description('Watch TypeScript files and regenerate schemas on change')
+    .option('-i, --input <pattern>', 'Input file pattern (glob)')
+    .option('-o, --output <dir>', 'Output directory')
+    .action(async (options) => {
+    try {
+        await watchAndGenerate(options);
+    }
+    catch (error) {
+        console.error('Error in watch mode:', error);
+        process.exit(1);
+    }
+});
+async function generateSchemas(options) {
+    const { input, output, type } = options;
+    if (!input || !output) {
+        console.error('Both --input and --output are required');
+        process.exit(1);
+    }
+    const inputPath = path.resolve(process.cwd(), input);
+    const outputPath = path.resolve(process.cwd(), output);
+    if (!fs.existsSync(inputPath)) {
+        console.error(`Input file not found: ${inputPath}`);
+        process.exit(1);
+    }
+    console.log(`Generating schemas from ${inputPath}...`);
+    // Read and parse TypeScript file
+    const sourceCode = fs.readFileSync(inputPath, 'utf-8');
+    const sourceFile = ts.createSourceFile(inputPath, sourceCode, ts.ScriptTarget.Latest, true);
+    const schemas = [];
+    const imports = new Set();
+    // Add imports
+    imports.add(`import v from '@oxog/schema-validator';`);
+    // Visit TypeScript AST
+    function visit(node) {
+        if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+            const typeName = node.name.text;
+            if (type && typeName !== type) {
+                return;
+            }
+            const schemaName = `${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}Schema`;
+            const schema = generateSchemaFromType(node, sourceFile);
+            if (schema) {
+                schemas.push(`export const ${schemaName} = ${schema};`);
+                schemas.push(`export type ${typeName} = v.Infer<typeof ${schemaName}>;`);
+                schemas.push('');
+            }
+        }
+        ts.forEachChild(node, visit);
+    }
+    visit(sourceFile);
+    // Generate output
+    const output_content = [
+        '// Generated by @oxog/schema-validator',
+        `// Source: ${path.basename(inputPath)}`,
+        `// Generated at: ${new Date().toISOString()}`,
+        '',
+        ...Array.from(imports),
+        '',
+        ...schemas
+    ].join('\n');
+    // Ensure output directory exists
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+    fs.writeFileSync(outputPath, output_content);
+    console.log(`✅ Schemas generated successfully at ${outputPath}`);
+}
+function generateSchemaFromType(node, sourceFile) {
+    if (ts.isInterfaceDeclaration(node)) {
+        return generateObjectSchema(node, sourceFile);
+    }
+    else if (ts.isTypeAliasDeclaration(node) && node.type) {
+        return generateSchemaFromTypeNode(node.type, sourceFile);
+    }
+    return null;
+}
+function generateObjectSchema(node, sourceFile) {
+    const properties = [];
+    for (const member of node.members) {
+        if (ts.isPropertySignature(member) && member.name) {
+            const propName = member.name.getText(sourceFile);
+            const isOptional = member.questionToken !== undefined;
+            const propType = member.type ? generateSchemaFromTypeNode(member.type, sourceFile) : 'v.unknown()';
+            const schema = isOptional ? `${propType}.optional()` : propType;
+            properties.push(`  ${propName}: ${schema}`);
+        }
+    }
+    return `v.object({\n${properties.join(',\n')}\n})`;
+}
+function generateSchemaFromTypeNode(typeNode, sourceFile) {
+    switch (typeNode.kind) {
+        case ts.SyntaxKind.StringKeyword:
+            return 'v.string()';
+        case ts.SyntaxKind.NumberKeyword:
+            return 'v.number()';
+        case ts.SyntaxKind.BooleanKeyword:
+            return 'v.boolean()';
+        case ts.SyntaxKind.UndefinedKeyword:
+            return 'v.undefined()';
+        case ts.SyntaxKind.NullKeyword:
+            return 'v.null()';
+        case ts.SyntaxKind.AnyKeyword:
+            return 'v.any()';
+        case ts.SyntaxKind.UnknownKeyword:
+            return 'v.unknown()';
+        case ts.SyntaxKind.VoidKeyword:
+            return 'v.void()';
+        case ts.SyntaxKind.NeverKeyword:
+            return 'v.never()';
+        case ts.SyntaxKind.BigIntKeyword:
+            return 'v.bigint()';
+        case ts.SyntaxKind.SymbolKeyword:
+            return 'v.symbol()';
+    }
+    if (ts.isArrayTypeNode(typeNode)) {
+        const elementType = generateSchemaFromTypeNode(typeNode.elementType, sourceFile);
+        return `v.array(${elementType})`;
+    }
+    if (ts.isUnionTypeNode(typeNode)) {
+        const types = typeNode.types.map(t => generateSchemaFromTypeNode(t, sourceFile));
+        return `v.union([${types.join(', ')}])`;
+    }
+    if (ts.isIntersectionTypeNode(typeNode)) {
+        const types = typeNode.types.map(t => generateSchemaFromTypeNode(t, sourceFile));
+        if (types.length === 2) {
+            return `v.intersection(${types[0]}, ${types[1]})`;
+        }
+        // For multiple intersections, chain them
+        return types.reduce((acc, type) => `v.intersection(${acc}, ${type})`);
+    }
+    if (ts.isLiteralTypeNode(typeNode)) {
+        if (ts.isStringLiteral(typeNode.literal)) {
+            return `v.literal('${typeNode.literal.text}')`;
+        }
+        if (ts.isNumericLiteral(typeNode.literal)) {
+            return `v.literal(${typeNode.literal.text})`;
+        }
+        if (typeNode.literal.kind === ts.SyntaxKind.TrueKeyword) {
+            return 'v.literal(true)';
+        }
+        if (typeNode.literal.kind === ts.SyntaxKind.FalseKeyword) {
+            return 'v.literal(false)';
+        }
+    }
+    if (ts.isTupleTypeNode(typeNode)) {
+        const elements = typeNode.elements.map(e => {
+            if (ts.isNamedTupleMember(e)) {
+                return generateSchemaFromTypeNode(e.type, sourceFile);
+            }
+            return generateSchemaFromTypeNode(e, sourceFile);
+        });
+        return `v.tuple([${elements.join(', ')}])`;
+    }
+    if (ts.isTypeReferenceNode(typeNode)) {
+        const typeName = typeNode.typeName.getText(sourceFile);
+        // Handle common type references
+        switch (typeName) {
+            case 'Date':
+                return 'v.date()';
+            case 'RegExp':
+                return 'v.instanceof(RegExp)';
+            case 'Promise':
+                if (typeNode.typeArguments && typeNode.typeArguments.length > 0) {
+                    const innerType = generateSchemaFromTypeNode(typeNode.typeArguments[0], sourceFile);
+                    return `v.promise(${innerType})`;
+                }
+                return 'v.promise(v.unknown())';
+            case 'Map':
+                if (typeNode.typeArguments && typeNode.typeArguments.length === 2) {
+                    const keyType = generateSchemaFromTypeNode(typeNode.typeArguments[0], sourceFile);
+                    const valueType = generateSchemaFromTypeNode(typeNode.typeArguments[1], sourceFile);
+                    return `v.map(${keyType}, ${valueType})`;
+                }
+                return 'v.map(v.unknown(), v.unknown())';
+            case 'Set':
+                if (typeNode.typeArguments && typeNode.typeArguments.length > 0) {
+                    const elementType = generateSchemaFromTypeNode(typeNode.typeArguments[0], sourceFile);
+                    return `v.set(${elementType})`;
+                }
+                return 'v.set(v.unknown())';
+            case 'Record':
+                if (typeNode.typeArguments && typeNode.typeArguments.length === 2) {
+                    const keyType = generateSchemaFromTypeNode(typeNode.typeArguments[0], sourceFile);
+                    const valueType = generateSchemaFromTypeNode(typeNode.typeArguments[1], sourceFile);
+                    return `v.record(${keyType}, ${valueType})`;
+                }
+                return 'v.record(v.string(), v.unknown())';
+            default:
+                // Assume it's a custom type that needs a schema
+                return `${typeName.charAt(0).toLowerCase()}${typeName.slice(1)}Schema`;
+        }
+    }
+    if (ts.isTypeLiteralNode(typeNode)) {
+        const properties = [];
+        for (const member of typeNode.members) {
+            if (ts.isPropertySignature(member) && member.name) {
+                const propName = member.name.getText(sourceFile);
+                const isOptional = member.questionToken !== undefined;
+                const propType = member.type ? generateSchemaFromTypeNode(member.type, sourceFile) : 'v.unknown()';
+                const schema = isOptional ? `${propType}.optional()` : propType;
+                properties.push(`  ${propName}: ${schema}`);
+            }
+        }
+        return `v.object({\n${properties.join(',\n')}\n})`;
+    }
+    // Default fallback
+    return 'v.unknown()';
+}
+async function validateData(options) {
+    const { schema, data, verbose } = options;
+    if (!schema || !data) {
+        console.error('Both --schema and --data are required');
+        process.exit(1);
+    }
+    const schemaPath = path.resolve(process.cwd(), schema);
+    const dataPath = path.resolve(process.cwd(), data);
+    if (!fs.existsSync(schemaPath)) {
+        console.error(`Schema file not found: ${schemaPath}`);
+        process.exit(1);
+    }
+    if (!fs.existsSync(dataPath)) {
+        console.error(`Data file not found: ${dataPath}`);
+        process.exit(1);
+    }
+    // Dynamic import of schema
+    const schemaModule = await Promise.resolve(`${schemaPath}`).then(s => __importStar(require(s)));
+    const schemaKeys = Object.keys(schemaModule).filter(k => k.endsWith('Schema'));
+    if (schemaKeys.length === 0) {
+        console.error('No schemas found in the schema file');
+        process.exit(1);
+    }
+    const schemaToUse = schemaModule[schemaKeys[0]];
+    // Read and parse data
+    const dataContent = fs.readFileSync(dataPath, 'utf-8');
+    let jsonData;
+    try {
+        jsonData = JSON.parse(dataContent);
+    }
+    catch (error) {
+        console.error('Invalid JSON in data file:', error);
+        process.exit(1);
+    }
+    // Validate
+    const result = schemaToUse.safeParse(jsonData);
+    if (result.success) {
+        console.log('✅ Validation successful!');
+        if (verbose) {
+            console.log('Validated data:', JSON.stringify(result.data, null, 2));
+        }
+    }
+    else {
+        console.error('❌ Validation failed!');
+        console.error('Errors:', result.error.format());
+        process.exit(1);
+    }
+}
+async function watchAndGenerate(options) {
+    const { input, output } = options;
+    if (!input || !output) {
+        console.error('Both --input and --output are required');
+        process.exit(1);
+    }
+    console.log(`Watching ${input} for changes...`);
+    // This would require a file watcher implementation
+    // For now, just show a message
+    console.log('Watch mode not yet implemented. Please use generate command manually.');
+}
+// Run the CLI
+program.parse(process.argv);
+//# sourceMappingURL=index.js.map

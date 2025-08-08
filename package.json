@@ -1,0 +1,85 @@
+{
+  "name": "@oxog/schema-validator",
+  "version": "1.0.0",
+  "description": "Type-safe schema validation library with zero dependencies",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "oxog-validator": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./plugins": {
+      "require": "./dist/plugins/index.js",
+      "import": "./dist/plugins/index.mjs",
+      "types": "./dist/plugins/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc && rollup -c",
+    "test": "jest --coverage",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration",
+    "test:performance": "jest tests/performance",
+    "benchmark": "tsx benchmarks/vs-zod.ts",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "validation",
+    "schema",
+    "typescript",
+    "type-safe",
+    "zod-alternative",
+    "validator",
+    "parsing"
+  ],
+  "author": "Ersin KOC",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.30",
+    "@typescript-eslint/eslint-plugin": "^7.3.1",
+    "@typescript-eslint/parser": "^7.3.1",
+    "eslint": "^8.57.0",
+    "fast-check": "^3.17.1",
+    "jest": "^29.7.0",
+    "rollup": "^4.13.0",
+    "rollup-plugin-dts": "^6.1.0",
+    "ts-jest": "^29.1.2",
+    "tslib": "^2.8.1",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.3",
+    "vitest": "^3.2.4",
+    "zod": "^3.22.4"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ersinkoc/schema-validator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ersinkoc/schema-validator/issues"
+  },
+  "homepage": "https://github.com/ersinkoc/schema-validator#readme",
+  "dependencies": {
+    "@types/commander": "^2.12.0",
+    "commander": "^14.0.0"
+  }
+}
