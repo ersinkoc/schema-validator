@@ -248,6 +248,10 @@ class BaseSchema {
                     childCtx.path = [...ctx.path, key];
                     childCtx.data = childData;
                     childCtx.parsedType = getParsedType(childData);
+                    // Override addIssue to use the child's path
+                    childCtx.addIssue = (issue) => {
+                        issues.push({ ...issue, path: childCtx.path });
+                    };
                     return childCtx;
                 },
                 clone: (cloneData, clonePath) => {
@@ -310,6 +314,10 @@ class BaseSchema {
                     childCtx.path = [...ctx.path, key];
                     childCtx.data = childData;
                     childCtx.parsedType = getParsedType(childData);
+                    // Override addIssue to use the child's path
+                    childCtx.addIssue = (issue) => {
+                        issues.push({ ...issue, path: childCtx.path });
+                    };
                     return childCtx;
                 },
                 clone: (cloneData, clonePath) => {
@@ -370,19 +378,19 @@ class BaseSchema {
         return NullishSchema;
     }
     array() {
-        const ArraySchema = require('./schemas/complex/array').array(this);
+        const ArraySchema = require('../schemas/complex/array').array(this);
         return ArraySchema;
     }
     promise() {
-        const PromiseSchema = require('./schemas/complex/promise').promise(this);
+        const PromiseSchema = require('../schemas/complex/promise').promise(this);
         return PromiseSchema;
     }
     or(schema) {
-        const UnionSchema = require('./schemas/complex/union').union([this, schema]);
+        const UnionSchema = require('../schemas/complex/union').union([this, schema]);
         return UnionSchema;
     }
     and(schema) {
-        const IntersectionSchema = require('./schemas/complex/intersection').intersection(this, schema);
+        const IntersectionSchema = require('../schemas/complex/intersection').intersection(this, schema);
         return IntersectionSchema;
     }
     transform(fn) {
@@ -614,19 +622,24 @@ class ObjectSchema extends BaseSchema {
                 // Process modifiers first (like default values)
                 const processedValue = schema._processModifiers ?
                     schema._processModifiers(value, childCtx) : value;
+                // Skip parsing if value is undefined/null and schema allows it
+                if ((processedValue === undefined && schema._isOptional) ||
+                    (processedValue === null && schema._isNullable)) {
+                    if (processedValue !== undefined) {
+                        result[key] = processedValue;
+                    }
+                    continue;
+                }
                 // Parse with the child context
                 const parsed = schema._parse(processedValue, childCtx);
                 // Only add to result if not undefined or if schema allows undefined
-                if (parsed !== undefined || schema.isOptional()) {
+                if (parsed !== undefined || schema._isOptional) {
                     result[key] = parsed;
                 }
             }
             catch (error) {
-                // Errors are already added to context with proper paths
-                // Just need to check if we should continue or fail fast
-                if (!ctx.common.async) {
-                    throw ctx.makeError();
-                }
+                // Continue parsing other fields to collect all errors
+                // The error has already been added to the context
             }
         }
         // Handle unknown keys
@@ -657,9 +670,7 @@ class ObjectSchema extends BaseSchema {
                         result[key] = parsed;
                     }
                     catch (error) {
-                        if (!ctx.common.async) {
-                            throw ctx.makeError();
-                        }
+                        // Continue parsing other fields to collect all errors
                     }
                 }
             }
@@ -1299,7 +1310,8 @@ function introspect(schema) {
                 constraints['integer'] = true;
             }
             else if (check.kind === 'regex') {
-                constraints['pattern'] = check.regex.toString();
+                const regexValue = check.regex || check.value;
+                constraints['pattern'] = regexValue ? regexValue.toString() : '';
             }
             else if (check.kind === 'email') {
                 constraints['format'] = 'email';
@@ -1355,7 +1367,7 @@ function getElement(schema) {
  * Get the options of a union schema
  */
 function getOptions(schema) {
-    return schema._options;
+    return schema._unionOptions || schema._options || [];
 }
 /**
  * Check if a schema has a specific modifier
@@ -1417,8 +1429,8 @@ function walkSchema(schema, visitor, path = []) {
     }
     // Recursively walk union options
     if (schema instanceof UnionSchema) {
-        const options = schema._options;
-        if (options) {
+        const options = schema._unionOptions || schema._options;
+        if (options && Array.isArray(options)) {
             options.forEach((opt, index) => {
                 walkSchema(opt, visitor, [...path, `|${index}`]);
             });

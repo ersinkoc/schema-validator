@@ -21,7 +21,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && rollup -c",
+    "build": "tsc && rollup -c rollup.config.mjs",
     "test": "jest --coverage",
     "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",

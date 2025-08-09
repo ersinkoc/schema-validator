@@ -83,7 +83,8 @@ function introspect(schema) {
                 constraints['integer'] = true;
             }
             else if (check.kind === 'regex') {
-                constraints['pattern'] = check.regex.toString();
+                const regexValue = check.regex || check.value;
+                constraints['pattern'] = regexValue ? regexValue.toString() : '';
             }
             else if (check.kind === 'email') {
                 constraints['format'] = 'email';
@@ -139,7 +140,7 @@ function getElement(schema) {
  * Get the options of a union schema
  */
 function getOptions(schema) {
-    return schema._options;
+    return schema._unionOptions || schema._options || [];
 }
 /**
  * Check if a schema has a specific modifier
@@ -201,8 +202,8 @@ function walkSchema(schema, visitor, path = []) {
     }
     // Recursively walk union options
     if (schema instanceof union_1.UnionSchema) {
-        const options = schema._options;
-        if (options) {
+        const options = schema._unionOptions || schema._options;
+        if (options && Array.isArray(options)) {
             options.forEach((opt, index) => {
                 walkSchema(opt, visitor, [...path, `|${index}`]);
             });

@@ -86,7 +86,8 @@ export function introspect(schema: SchemaDefinition): SchemaInfo {
       } else if (check.kind === 'int') {
         constraints['integer'] = true;
       } else if (check.kind === 'regex') {
-        constraints['pattern'] = check.regex.toString();
+        const regexValue = check.regex || check.value;
+        constraints['pattern'] = regexValue ? regexValue.toString() : '';
       } else if (check.kind === 'email') {
         constraints['format'] = 'email';
       } else if (check.kind === 'url') {
@@ -151,7 +152,7 @@ export function getElement<T extends ArraySchema<any>>(
 export function getOptions<T extends UnionSchema<any>>(
   schema: T
 ): T extends UnionSchema<infer O> ? O : never {
-  return (schema as any)._options;
+  return (schema as any)._unionOptions || (schema as any)._options || [];
 }
 
 /**
@@ -234,8 +235,8 @@ export function walkSchema(
 
   // Recursively walk union options
   if (schema instanceof UnionSchema) {
-    const options = (schema as any)._options;
-    if (options) {
+    const options = (schema as any)._unionOptions || (schema as any)._options;
+    if (options && Array.isArray(options)) {
       options.forEach((opt: SchemaDefinition, index: number) => {
         walkSchema(opt, visitor, [...path, `|${index}`]);
       });

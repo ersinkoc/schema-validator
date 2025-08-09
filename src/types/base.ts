@@ -315,22 +315,22 @@ export abstract class BaseSchema<Input = any, Output = Input> implements SchemaD
   }
 
   array(): SchemaDefinition<Input[], Output[]> {
-    const ArraySchema = require('./schemas/complex/array').array(this);
+    const ArraySchema = require('../schemas/complex/array').array(this);
     return ArraySchema as any;
   }
 
   promise(): SchemaDefinition<Promise<Input>, Promise<Output>> {
-    const PromiseSchema = require('./schemas/complex/promise').promise(this);
+    const PromiseSchema = require('../schemas/complex/promise').promise(this);
     return PromiseSchema as any;
   }
 
   or<T>(schema: SchemaDefinition<any, T>): SchemaDefinition<Input | T, Output | T> {
-    const UnionSchema = require('./schemas/complex/union').union([this, schema]);
+    const UnionSchema = require('../schemas/complex/union').union([this, schema]);
     return UnionSchema as any;
   }
 
   and<T>(schema: SchemaDefinition<any, T>): SchemaDefinition<Input & T, Output & T> {
-    const IntersectionSchema = require('./schemas/complex/intersection').intersection(this, schema);
+    const IntersectionSchema = require('../schemas/complex/intersection').intersection(this, schema);
     return IntersectionSchema as any;
   }
 

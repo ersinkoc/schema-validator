@@ -81,8 +81,8 @@ export declare abstract class BaseSchema<Input = any, Output = Input> implements
     protected _catch?: Output | ((error: ValidationError) => Output);
     protected _description?: string;
     constructor(options?: SchemaOptions);
-    abstract _parse(input: unknown, ctx: RefinementCtx): Output;
-    abstract _parseAsync(input: unknown, ctx: RefinementCtx): Promise<Output>;
+    abstract _parse(input: unknown, ctx: any): Output;
+    abstract _parseAsync(input: unknown, ctx: any): Promise<Output>;
     protected _processModifiers(data: unknown, _ctx: RefinementCtx): unknown;
     parse(data: unknown): Output;
     parseAsync(data: unknown): Promise<Output>;

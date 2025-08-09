@@ -46,19 +46,24 @@ class ObjectSchema extends base_1.BaseSchema {
                 // Process modifiers first (like default values)
                 const processedValue = schema._processModifiers ?
                     schema._processModifiers(value, childCtx) : value;
+                // Skip parsing if value is undefined/null and schema allows it
+                if ((processedValue === undefined && schema._isOptional) ||
+                    (processedValue === null && schema._isNullable)) {
+                    if (processedValue !== undefined) {
+                        result[key] = processedValue;
+                    }
+                    continue;
+                }
                 // Parse with the child context
                 const parsed = schema._parse(processedValue, childCtx);
                 // Only add to result if not undefined or if schema allows undefined
-                if (parsed !== undefined || schema.isOptional()) {
+                if (parsed !== undefined || schema._isOptional) {
                     result[key] = parsed;
                 }
             }
             catch (error) {
-                // Errors are already added to context with proper paths
-                // Just need to check if we should continue or fail fast
-                if (!ctx.common.async) {
-                    throw ctx.makeError();
-                }
+                // Continue parsing other fields to collect all errors
+                // The error has already been added to the context
             }
         }
         // Handle unknown keys
@@ -89,9 +94,7 @@ class ObjectSchema extends base_1.BaseSchema {
                         result[key] = parsed;
                     }
                     catch (error) {
-                        if (!ctx.common.async) {
-                            throw ctx.makeError();
-                        }
+                        // Continue parsing other fields to collect all errors
                     }
                 }
             }

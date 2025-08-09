@@ -95,6 +95,10 @@ class BaseSchema {
                     childCtx.path = [...ctx.path, key];
                     childCtx.data = childData;
                     childCtx.parsedType = (0, errors_1.getParsedType)(childData);
+                    // Override addIssue to use the child's path
+                    childCtx.addIssue = (issue) => {
+                        issues.push({ ...issue, path: childCtx.path });
+                    };
                     return childCtx;
                 },
                 clone: (cloneData, clonePath) => {
@@ -157,6 +161,10 @@ class BaseSchema {
                     childCtx.path = [...ctx.path, key];
                     childCtx.data = childData;
                     childCtx.parsedType = (0, errors_1.getParsedType)(childData);
+                    // Override addIssue to use the child's path
+                    childCtx.addIssue = (issue) => {
+                        issues.push({ ...issue, path: childCtx.path });
+                    };
                     return childCtx;
                 },
                 clone: (cloneData, clonePath) => {
@@ -217,19 +225,19 @@ class BaseSchema {
         return NullishSchema;
     }
     array() {
-        const ArraySchema = require('./schemas/complex/array').array(this);
+        const ArraySchema = require('../schemas/complex/array').array(this);
         return ArraySchema;
     }
     promise() {
-        const PromiseSchema = require('./schemas/complex/promise').promise(this);
+        const PromiseSchema = require('../schemas/complex/promise').promise(this);
         return PromiseSchema;
     }
     or(schema) {
-        const UnionSchema = require('./schemas/complex/union').union([this, schema]);
+        const UnionSchema = require('../schemas/complex/union').union([this, schema]);
         return UnionSchema;
     }
     and(schema) {
-        const IntersectionSchema = require('./schemas/complex/intersection').intersection(this, schema);
+        const IntersectionSchema = require('../schemas/complex/intersection').intersection(this, schema);
         return IntersectionSchema;
     }
     transform(fn) {
