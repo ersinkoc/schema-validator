@@ -1,26 +1,25 @@
-// Basic usage examples for @oxog/schema-validator
+/**
+ * Basic usage examples for @oxog/schema-validator
+ * Demonstrates core validation features and common use cases
+ */
+
 const v = require('../dist/index.js').default;
 
-console.log('=== Basic Usage Examples ===\n');
+console.log('🚀 Basic Schema Validation Examples\n');
 
-// 1. Simple string validation
-console.log('1. String validation:');
+// 1. String validation
 const emailSchema = v.string().email();
-const emailResult = emailSchema.safeParse('user@example.com');
-console.log('Valid email:', emailResult.success ? emailResult.data : emailResult.error.issues);
+console.log('✉️  Email validation:');
+console.log('  Valid:', emailSchema.safeParse('user@example.com').success); // true
+console.log('  Invalid:', emailSchema.safeParse('not-email').success); // false
 
-const invalidEmail = emailSchema.safeParse('not-an-email');
-console.log('Invalid email:', invalidEmail.success ? 'Unexpected' : 'Validation failed (expected)');
-
-// 2. Number validation with constraints
-console.log('\n2. Number validation:');
+// 2. Number validation
 const ageSchema = v.number().int().min(0).max(120);
-console.log('Valid age (25):', ageSchema.safeParse(25).success);
-console.log('Invalid age (-5):', ageSchema.safeParse(-5).success);
-console.log('Invalid age (3.14):', ageSchema.safeParse(3.14).success);
+console.log('\n🔢 Number validation:');
+console.log('  Valid age (25):', ageSchema.safeParse(25).success); // true
+console.log('  Invalid age (-5):', ageSchema.safeParse(-5).success); // false
 
-// 3. Object schema
-console.log('\n3. Object validation:');
+// 3. Object schema - Most common use case
 const userSchema = v.object({
   name: v.string().min(2),
   email: v.string().email(),
@@ -28,69 +27,50 @@ const userSchema = v.object({
   active: v.boolean().default(true)
 });
 
-const validUser = {
+const user = userSchema.parse({
   name: 'John Doe',
   email: 'john@example.com',
   age: 30
-};
+  // active will default to true
+});
+console.log('\n👤 User object:', user);
 
-const userResult = userSchema.safeParse(validUser);
-console.log('Valid user:', userResult.success ? 'Passed' : 'Failed');
-if (userResult.success) {
-  console.log('User data:', userResult.data);
-}
-
-// 4. Array validation
-console.log('\n4. Array validation:');
+// 4. Arrays
 const tagsSchema = v.array(v.string()).min(1).max(5);
-const tags = ['javascript', 'typescript', 'nodejs'];
-console.log('Valid tags:', tagsSchema.safeParse(tags).success);
-console.log('Empty array:', tagsSchema.safeParse([]).success);
+console.log('\n🏷️  Array validation:');
+console.log('  Valid:', tagsSchema.safeParse(['js', 'ts']).success); // true
+console.log('  Empty:', tagsSchema.safeParse([]).success); // false (min: 1)
 
-// 5. Union types
-console.log('\n5. Union types:');
+// 5. Union types - Multiple possible types
 const idSchema = v.union([
   v.string().uuid(),
   v.number().int().positive()
 ]);
+console.log('\n🔀 Union types:');
+console.log('  UUID:', idSchema.safeParse('550e8400-e29b-41d4-a716-446655440000').success); // true
+console.log('  Number:', idSchema.safeParse(123).success); // true
 
-console.log('UUID string:', idSchema.safeParse('550e8400-e29b-41d4-a716-446655440000').success);
-console.log('Positive integer:', idSchema.safeParse(123).success);
-console.log('Negative number:', idSchema.safeParse(-123).success);
+// 6. Transform - Modify data during parsing
+const normalizedEmail = v.string()
+  .email()
+  .transform(email => email.toLowerCase().trim());
+console.log('\n🔄 Transform:');
+console.log('  Input: "  USER@EXAMPLE.COM  "');
+console.log('  Output:', normalizedEmail.parse('  USER@EXAMPLE.COM  ')); // user@example.com
 
-// 6. Transform
-console.log('\n6. Transform:');
-const upperCaseSchema = v.string().transform(s => s.toUpperCase());
-const transformed = upperCaseSchema.parse('hello world');
-console.log('Transformed:', transformed);
-
-// 7. Optional and nullable
-console.log('\n7. Optional and nullable:');
-const profileSchema = v.object({
-  bio: v.string().optional(),
-  website: v.string().url().nullable(),
-  followers: v.number().default(0)
-});
-
-const profile = profileSchema.parse({});
-console.log('Profile with defaults:', profile);
-
-// 8. Literal values
-console.log('\n8. Literal values:');
-const statusSchema = v.literal('active');
-console.log('Literal "active":', statusSchema.safeParse('active').success);
-console.log('Literal "inactive":', statusSchema.safeParse('inactive').success);
-
-// 9. Enum
-console.log('\n9. Enum:');
+// 7. Enum - Restrict to specific values
 const roleSchema = v.enum(['admin', 'user', 'guest']);
-console.log('Valid role "admin":', roleSchema.safeParse('admin').success);
-console.log('Invalid role "superuser":', roleSchema.safeParse('superuser').success);
+console.log('\n📋 Enum validation:');
+console.log('  Valid role:', roleSchema.safeParse('admin').success); // true
+console.log('  Invalid role:', roleSchema.safeParse('superuser').success); // false
 
-// 10. Date validation
-console.log('\n10. Date validation:');
-const dateSchema = v.date().min(new Date('2020-01-01')).max(new Date('2030-01-01'));
-const now = new Date();
-console.log('Current date valid:', dateSchema.safeParse(now).success);
+// 8. Error handling
+console.log('\n❌ Error handling:');
+const result = userSchema.safeParse({ name: 'J', age: 'not-a-number' });
+if (!result.success) {
+  result.error.issues.forEach(issue => {
+    console.log(`  ${issue.path.join('.')}: ${issue.message}`);
+  });
+}
 
-console.log('\n=== All examples completed ===');
+console.log('\n✅ Examples completed!');

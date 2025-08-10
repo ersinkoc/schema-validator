@@ -1,8 +1,11 @@
-// TypeScript usage examples for @oxog/schema-validator
+/**
+ * TypeScript usage examples for @oxog/schema-validator
+ * Demonstrates type inference, branded types, and type-safe validation
+ */
+
 import v, { Infer, Input, Output } from '../src';
 
-// 1. Type inference
-console.log('=== TypeScript Type Inference Examples ===\n');
+console.log('📝 TypeScript Type Inference Examples\n');
 
 const userSchema = v.object({
   id: v.string().uuid(),

@@ -1,4 +1,7 @@
-// Plugin system example for @oxog/schema-validator
+/**
+ * Plugin system example for @oxog/schema-validator
+ * Demonstrates how to create and use custom validators
+ */
 const v = require('../dist/index.js').default;
 const { PluginManager } = require('../dist/index.js');
 

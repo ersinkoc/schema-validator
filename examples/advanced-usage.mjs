@@ -1,7 +1,11 @@
-// Advanced usage examples for @oxog/schema-validator (ESM)
+/**
+ * Advanced usage examples for @oxog/schema-validator
+ * Demonstrates complex schemas, transforms, and async validation
+ */
+
 import v from '../dist/index.mjs';
 
-console.log('=== Advanced Usage Examples ===\n');
+console.log('🎆 Advanced Schema Validation Examples\n');
 
 // 1. Complex nested object with transforms
 console.log('1. Complex nested schema:');
